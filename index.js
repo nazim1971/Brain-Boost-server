@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config()
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const port = process.env.PORT || 5000;
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -15,6 +17,28 @@ const corsOption = {
 // middle wire
 app.use(cors(corsOption))
 app.use(express.json())
+// cookie
+app.use(cookieParser())
+
+
+// selfmade middlewire for verify jwt
+const verifyToken = (req,res,next)=>{
+
+  const token  = req.cookies?.token;
+  if(!token) return res.status(401).send({message: 'unauthorized  access'})
+      // console.log("this is cookies token",token);
+      if(token){
+        jwt.verify(token,process.env.ACCESS_TOKEN_SECRET, (err, decoded)=>{
+          if(err){
+          return  res.status(401).send({message: 'unauthorized  access'})
+          }
+          req.user = decoded;
+          // console.log(decoded);
+          next()
+        })
+      } 
+      
+}
 
 
 // mongo DB
@@ -39,6 +63,33 @@ async function run() {
         const assignmentCollection = client.db('brainDB').collection('allAssign');
         const doneCollection = client.db('brainDB').collection('doneAssign');
 
+    // jwt generator
+    app.post('/jwt', async(req,res)=>{
+      const user = req.body;
+      // console.log('this is user ', user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '30d'})
+      // console.log('this is tok tok tik tik', token);
+
+
+          // clear coockie
+    app.get('/logout', (req,res)=>{
+      res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        maxAge: 0,
+        
+      }, {withCredentials: true}).send({success: true})
+    })
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+        
+      }).send({success: true})
+    })
+
+
 
         // get all assignment
         app.get('/allPost',async(req,res)=>{
@@ -62,25 +113,44 @@ async function run() {
             res.send(result)
         })
 
-        // done all assignent add to the db
-        app.post('/doneAssign',async(req,res)=>{
-          const assignmentData = req.body;
-          const result = await doneCollection.insertOne(assignmentData);
-          res.send(result)
-        }) 
+
 
         // get all pending assigment
         app.get('/pending',async(req,res)=>{
           const result = await doneCollection.find({status: 'pending'}).toArray()
           res.send(result)
         })
+        // get pending assign details by id
+        app.get('/pending/:id',verifyToken,async(req,res)=>{
+          const id = req.params.id
+          const query = {_id : new ObjectId(id)}
+          const result = await doneCollection.findOne(query)
+          res.send(result)
+
+        })
         // get my attempted assignment
-        app.get('/getAssign/:email',async(req,res)=>{
+        app.get('/getAssign/:email',verifyToken,async(req,res)=>{
           const email = req.params.email;
           const query = {"doneUserEmail": email};
           const result = await doneCollection.find(query).toArray()
           res.send(result)
         })
+
+    // update pending item in db
+    app.put('/pending/:id',async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)}
+      const assignmentData = req.body
+      const option = {upsert: true};
+      const updateDoc = {
+        $set: {
+          ...assignmentData,
+        },
+      }
+      const result = await doneCollection.updateOne(query, updateDoc , option);
+      res.send(result)
+    })
+
 
 
             // update assignment data in db
@@ -99,7 +169,7 @@ async function run() {
     })
 
         // get single assignment data
-        app.get('/onePost/:id',async(req,res)=>{
+        app.get('/onePost/:id',verifyToken,async(req,res)=>{
           const id = req.params.id
           const query = {_id : new ObjectId(id)}
           const result = await assignmentCollection.findOne(query)
