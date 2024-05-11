@@ -37,6 +37,8 @@ async function run() {
 
         // database 
         const assignmentCollection = client.db('brainDB').collection('allAssign');
+        const doneCollection = client.db('brainDB').collection('doneAssign');
+
 
         // get all assignment
         app.get('/allPost',async(req,res)=>{
@@ -58,6 +60,50 @@ async function run() {
             const assignmentData = req.body;
             const result = await assignmentCollection.insertOne(assignmentData);
             res.send(result)
+        })
+
+        // done all assignent add to the db
+        app.post('/doneAssign',async(req,res)=>{
+          const assignmentData = req.body;
+          const result = await doneCollection.insertOne(assignmentData);
+          res.send(result)
+        }) 
+
+        // get all pending assigment
+        app.get('/pending',async(req,res)=>{
+          const result = await doneCollection.find({status: 'pending'}).toArray()
+          res.send(result)
+        })
+        // get my attempted assignment
+        app.get('/getAssign/:email',async(req,res)=>{
+          const email = req.params.email;
+          const query = {"doneUserEmail": email};
+          const result = await doneCollection.find(query).toArray()
+          res.send(result)
+        })
+
+
+            // update assignment data in db
+    app.put('/updatePost/:id',async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)}
+      const assignmentData = req.body
+      const option = {upsert: true};
+      const updateDoc = {
+        $set: {
+          ...assignmentData,
+        },
+      }
+      const result = await assignmentCollection.updateOne(query, updateDoc , option);
+      res.send(result)
+    })
+
+        // get single assignment data
+        app.get('/onePost/:id',async(req,res)=>{
+          const id = req.params.id
+          const query = {_id : new ObjectId(id)}
+          const result = await assignmentCollection.findOne(query)
+          res.send(result)
         })
     
     await client.db("admin").command({ ping: 1 });
