@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config()
+require('dotenv').config();
+
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+  
 const port = process.env.PORT || 5000;
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -17,29 +19,26 @@ const corsOption = {
 // middle wire
 app.use(cors(corsOption))
 app.use(express.json())
-// cookie
 app.use(cookieParser())
 
 
-// selfmade middlewire for verify jwt
+// verify jwt middlewire
+
 const verifyToken = (req,res,next)=>{
+  const token = req.cookies?.token;
+  if(!token) return res.status(401).send({message: 'unauthorized access 11'})
 
-  const token  = req.cookies?.token;
-  if(!token) return res.status(401).send({message: 'unauthorized  access'})
-      // console.log("this is cookies token",token);
-      if(token){
-        jwt.verify(token,process.env.ACCESS_TOKEN_SECRET, (err, decoded)=>{
-          if(err){
-          return  res.status(401).send({message: 'unauthorized  access'})
-          }
-          req.user = decoded;
-          // console.log(decoded);
-          next()
-        })
-      } 
-      
+          if(token){
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET,(err,decoded )=>{
+              if(err){
+                return res.status(401).send({message: 'unauthorized access '})
+              }
+              console.log('this is decoed',decoded);
+              req.user = decoded;
+              next()
+            })
+          } 
 }
-
 
 // mongo DB
 
@@ -63,33 +62,33 @@ async function run() {
         const assignmentCollection = client.db('brainDB').collection('allAssign');
         const doneCollection = client.db('brainDB').collection('doneAssign');
 
-    // jwt generator
-    app.post('/jwt', async(req,res)=>{
-      const user = req.body;
-      // console.log('this is user ', user);
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '30d'})
-      // console.log('this is tok tok tik tik', token);
+        // jwt
+        app.post('/jwt',async(req,res)=>{
+          const user = req.body;
+          console.log("token user", user);
+          const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET,{
+            expiresIn: '7d'
+          } )
+          console.log("tok tok token", token);
+          res.cookie('token', token,{
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production", 
+            sameSite: process.env.NODE_ENV === 'production'? 'none' : 'strict' 
 
+          }).send({success: true})
+        })
 
-          // clear coockie
-    app.get('/logout', (req,res)=>{
-      res.clearCookie('token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-        maxAge: 0,
-        
-      }, {withCredentials: true}).send({success: true})
-    })
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
-        
-      }).send({success: true})
-    })
+        // clear token after logout
 
-
+        app.get('/logout', (req,res)=>{
+          res.clearCookie(
+            'token',{
+              httpOnly: true,
+            secure: process.env.NODE_ENV === "production", 
+            sameSite: process.env.NODE_ENV === 'production'? 'none' : 'strict' ,
+            maxAge: 0,
+            } ,{withCredentials: true}).send({success: true})
+        })
 
         // get all assignment
         app.get('/allPost',async(req,res)=>{
@@ -107,16 +106,21 @@ async function run() {
 
 
         // add all posted assignment in db
-        app.post('/allAssign',async(req,res)=>{
+        app.post('/allAssign',verifyToken,async(req,res)=>{
             const assignmentData = req.body;
             const result = await assignmentCollection.insertOne(assignmentData);
             res.send(result)
         })
 
-
+        // done all assignent add to the db
+        app.post('/doneAssign',async(req,res)=>{
+          const assignmentData = req.body;
+          const result = await doneCollection.insertOne(assignmentData);
+          res.send(result)
+        }) 
 
         // get all pending assigment
-        app.get('/pending',async(req,res)=>{
+        app.get('/pending',verifyToken,async(req,res)=>{
           const result = await doneCollection.find({status: 'pending'}).toArray()
           res.send(result)
         })
@@ -130,14 +134,20 @@ async function run() {
         })
         // get my attempted assignment
         app.get('/getAssign/:email',verifyToken,async(req,res)=>{
+          const tokenData = req.user.email
+          // console.log( tokenData);
           const email = req.params.email;
+          // console.log( email);
+          if(tokenData !== email){
+            return res.status(403).send({message: 'Forbidden access'})
+          }
           const query = {"doneUserEmail": email};
           const result = await doneCollection.find(query).toArray()
           res.send(result)
         })
 
     // update pending item in db
-    app.put('/pending/:id',async(req,res)=>{
+    app.put('/updatePending/:id',async(req,res)=>{
       const id = req.params.id;
       const query = {_id : new ObjectId(id)}
       const assignmentData = req.body
@@ -150,7 +160,6 @@ async function run() {
       const result = await doneCollection.updateOne(query, updateDoc , option);
       res.send(result)
     })
-
 
 
             // update assignment data in db
