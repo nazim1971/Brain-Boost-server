@@ -26,14 +26,13 @@ app.use(cookieParser())
 
 const verifyToken = (req,res,next)=>{
   const token = req.cookies?.token;
-  if(!token) return res.status(401).send({message: 'unauthorized access 11'})
+  if(!token) return res.status(401).send({message: 'Unauthorized access '})
 
           if(token){
             jwt.verify(token, process.env.ACCESS_TOKEN_SECRET,(err,decoded )=>{
               if(err){
-                return res.status(401).send({message: 'unauthorized access '})
+                return res.status(401).send({message: 'Unauthorized access '})
               }
-              console.log('this is decoed',decoded);
               req.user = decoded;
               next()
             })
@@ -61,11 +60,11 @@ async function run() {
         // database 
         const assignmentCollection = client.db('brainDB').collection('allAssign');
         const doneCollection = client.db('brainDB').collection('doneAssign');
+        const populerCollection = client.db('brainDB').collection('populerAssign');
 
         // jwt
         app.post('/jwt',async(req,res)=>{
           const user = req.body;
-          console.log("token user", user);
           const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET,{
             expiresIn: '7d'
           } )
@@ -135,9 +134,7 @@ async function run() {
         // get my attempted assignment
         app.get('/getAssign/:email',verifyToken,async(req,res)=>{
           const tokenData = req.user.email
-          // console.log( tokenData);
           const email = req.params.email;
-          // console.log( email);
           if(tokenData !== email){
             return res.status(403).send({message: 'Forbidden access'})
           }
@@ -182,6 +179,13 @@ async function run() {
           const id = req.params.id
           const query = {_id : new ObjectId(id)}
           const result = await assignmentCollection.findOne(query)
+          res.send(result)
+        })
+
+        // get populer assignment data from populerAssign collection
+
+        app.get('/populer', async(req,res)=>{
+          const result = await populerCollection.find().toArray()
           res.send(result)
         })
     
