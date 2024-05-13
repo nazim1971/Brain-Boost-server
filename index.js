@@ -68,7 +68,6 @@ async function run() {
           const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET,{
             expiresIn: '7d'
           } )
-          console.log("tok tok token", token);
           res.cookie('token', token,{
             httpOnly: true,
             secure: process.env.NODE_ENV === "production", 
@@ -188,6 +187,9 @@ async function run() {
           const result = await populerCollection.find().toArray()
           res.send(result)
         })
+
+         
+
     
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
