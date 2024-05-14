@@ -11,7 +11,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // CORS
 const corsOption = {
-    origin: ['http://localhost:5173','http://localhost:5174'],
+    origin: ['http://localhost:5173','https://brainboost-e787c.web.app','https://brainboost-e787c.firebaseapp.com'],
     credentials: true,
     optionSuccessStatus: 200,
 }
@@ -188,10 +188,18 @@ async function run() {
           res.send(result)
         })
 
+        // get single populer data by id
+                app.get('/populer/:id',verifyToken,async(req,res)=>{
+                  const id = req.params.id
+                  const query = {_id : new ObjectId(id)}
+                  const result = await populerCollection.findOne(query)
+                  res.send(result)
+        
+                })
          
 
     
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     
