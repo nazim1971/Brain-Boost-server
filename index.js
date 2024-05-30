@@ -142,6 +142,30 @@ async function run() {
           res.send(result)
         })
 
+        // get completed assignments
+app.get('/getCompletedAssignments/:email', verifyToken, async (req, res) => {
+  const tokenData = req.user.email;
+  const email = req.params.email;
+  
+  if (tokenData !== email) {
+    return res.status(403).send({ message: 'Forbidden access' });
+  }
+
+  const query = {
+    "doneUserEmail": email,
+    "status": "Complete" // Assuming "status" field indicates completeness
+  };
+
+  try {
+    const result = await doneCollection.find(query).toArray();
+    res.send(result);
+  } catch (error) {
+    console.error('Error fetching completed assignments:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+});
+
+
     // update pending item in db
     app.put('/updatePending/:id',async(req,res)=>{
       const id = req.params.id;
